@@ -205,14 +205,14 @@ ENTRYPOINT ["/home/script/script.sh"]
 Build de l'image :
 
 ```bash
-docker build -t mon-compilateur .
+docker build -t compilateur .
 ```
 
 Test avec vos fichiers C :
 
 ```bash
 # Dans le dossier contenant script1.c et script2.c
-docker run -v $(pwd):/home/script mon-compilateur
+docker run -v $(pwd):/home/script compilateur
 ```
 
 **Le piège** : Le script `script.sh` doit être exécutable (`chmod +x`). Sans ça, le container ne peut pas le lancer.
@@ -225,10 +225,10 @@ Tag et push de votre image :
 
 ```bash
 # Tag pour votre registry local
-docker tag mon-compilateur localhost:5000/mon-compilateur
+docker tag compilateur localhost:5000/compilateur
 
 # Push vers le registry
-docker push localhost:5000/mon-compilateur
+docker push localhost:5000/compilateur
 ```
 
 Pour le registry HTTPS avec certificat auto-signé, configuration du daemon :
