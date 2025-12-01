@@ -219,8 +219,6 @@ Test avec vos fichiers C :
 docker run -v $(pwd):/home/script compilateur
 ```
 
-**Le piège** : Le script `script.sh` doit être exécutable (`chmod +x`). Sans ça, le container ne peut pas le lancer.
-
 ## IV - Docker Registry
 
 Suivez le tutoriel : https://devopssec.fr/article/deployer-manipuler-securiser-un-serveur-registry-docker-prive
