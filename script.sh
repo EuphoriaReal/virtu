@@ -1,12 +1,11 @@
 #!/bin/bash
 
-folder='/home/script/'
-files=`ls /home/script/| grep -E .c$` 
+cd /home/script
 
-
-
-for i in $files
-do
-	 newName=`echo $folder$i | cut -d. -f1`
-	`gcc -o $newName'.o' $folder$i`
+for file in *.c; do
+    if [ -f "$file" ]; then
+        basename="${file%.c}"
+        gcc -o "${basename}.o" "$file"
+        echo "Compiled: $file -> ${basename}.o"
+    fi
 done
