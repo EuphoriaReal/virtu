@@ -69,7 +69,7 @@ void create_zombie(void) {
 }
 
 /**
- * "Récolte" les processus zombies avec waitpid()
+ * "Supprime" les processus zombies avec waitpid()
  * Note: On ne tue PAS les zombies, on récupère leur statut de sortie
  * C'est wait() qui nettoie les zombies de la table des processus
  */
@@ -78,20 +78,18 @@ void cleanup_zombies(void) {
     pid_t pid;
     int cleaned = 0;
     
-    printf("[MANAGER] Début de la récolte des zombies...\n");
-    
     // WNOHANG = non-bloquant, récupère tous les enfants terminés
     while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
         cleaned++;
-        printf("[MANAGER] Zombie récolté (PID: %d, exit status: %d)\n", 
+        printf("[MANAGER] Zombie supprimé (PID: %d, exit status: %d)\n", 
                pid, WEXITSTATUS(status));
     }
     
     if (cleaned > 0) {
-        printf("[MANAGER] Total: %d zombie(s) récolté(s) et nettoyé(s)\n", cleaned);
+        printf("[MANAGER] Total: %d zombie(s) supprimé(s) et nettoyé(s)\n", cleaned);
         zombie_count = 0;
     } else {
-        printf("[MANAGER] Aucun zombie à récolter.\n");
+        printf("[MANAGER] Aucun zombie à supprimé.\n");
     }
 }
 
@@ -116,7 +114,7 @@ void print_instructions(pid_t pid) {
     printf("[MANAGER] Démarrage avec PID: %d\n\n", pid);
     
     printf("📡 SIGNAUX DISPONIBLES:\n");
-    printf("  → SIGUSR1: Récolter les zombies      (kill -SIGUSR1 %d)\n", pid);
+    printf("  → SIGUSR1: Supprimer les zombies      (kill -SIGUSR1 %d)\n", pid);
     printf("  → SIGUSR2: Arrêter création           (kill -SIGUSR2 %d)\n", pid);
     printf("  → SIGINT:  Quitter proprement         (Ctrl+C)\n\n");
     
@@ -134,7 +132,7 @@ int main(void) {
     
     print_instructions(manager_pid);
     
-    // Configuration des signaux avec sigaction (plus robuste que signal())
+    // Configuration des signaux avec sigaction
     struct sigaction sa_usr1, sa_usr2, sa_int;
     
     memset(&sa_usr1, 0, sizeof(sa_usr1));
