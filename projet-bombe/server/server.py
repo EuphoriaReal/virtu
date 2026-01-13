@@ -23,15 +23,17 @@ class Server:
         self.timer = None
         self.lock = threading.Lock()
 
+    def log(self, msg):
+        print(msg, flush=True)
+
     def broadcast(self, msg, exclude=None):
         data = json.dumps(msg).encode()
-        with self.lock:
-            for pid, sock in list(self.players.items()):
-                if pid != exclude:
-                    try:
-                        sock.send(data)
-                    except:
-                        pass
+        for pid, sock in list(self.players.items()):
+            if pid != exclude:
+                try:
+                    sock.send(data)
+                except:
+                    pass
 
     def handle_client(self, sock, addr):
         player_id = None
@@ -48,7 +50,7 @@ class Server:
                         self.players[player_id] = sock
                         if not self.game_started:
                             self.alive.append(player_id)
-                    print(f"[+] {player_id} connecte ({len(self.players)} joueurs)")
+                    self.log(f"[+] {player_id} connecte ({len(self.players)} joueurs)")
                     sock.send(json.dumps({'status': 'ok'}).encode())
                     self.broadcast({'event': 'join', 'player': player_id}, player_id)
                 
@@ -57,7 +59,7 @@ class Server:
                     with self.lock:
                         if player_id == self.bomb_holder and target in self.alive and target != player_id:
                             self.bomb_holder = target
-                            print(f"[>] Bombe: {player_id} -> {target}")
+                            self.log(f"[>] Bombe: {player_id} -> {target}")
                             self.broadcast({'event': 'pass', 'from': player_id, 'to': target})
         except:
             pass
@@ -67,9 +69,11 @@ class Server:
                     del self.players[player_id]
                     if player_id in self.alive:
                         self.alive.remove(player_id)
-                    print(f"[-] {player_id} deconnecte")
+                    self.log(f"[-] {player_id} deconnecte")
 
     def explode(self):
+        start_new_timer = False
+        
         with self.lock:
             if not self.game_started or len(self.alive) <= 1:
                 return
@@ -78,26 +82,28 @@ class Server:
             if eliminated in self.alive:
                 self.alive.remove(eliminated)
             
-            print(f"[X] BOOM! {eliminated} elimine!")
+            self.log(f"[X] BOOM! {eliminated} elimine!")
             self.broadcast({'event': 'explosion', 'eliminated': eliminated})
             
             if len(self.alive) == 1:
                 winner = self.alive[0]
-                print(f"[*] Gagnant: {winner}")
+                self.log(f"[*] Gagnant: {winner}")
                 self.broadcast({'event': 'win', 'winner': winner})
                 self.game_started = False
-                print("[*] Tapez 'reset' puis 'start' pour rejouer.")
+                self.log("[*] Tapez 'reset' puis 'start' pour rejouer.")
             elif len(self.alive) > 1:
                 self.bomb_holder = random.choice(self.alive)
-                print(f"[o] Nouveau porteur: {self.bomb_holder}")
-                self.broadcast({'event': 'new_round', 'holder': self.bomb_holder, 'alive': self.alive})
-                self.start_timer()
+                self.log(f"[o] Nouveau porteur: {self.bomb_holder}")
+                self.broadcast({'event': 'new_round', 'holder': self.bomb_holder, 'alive': list(self.alive)})
+                start_new_timer = True
+        
+        # Hors du lock pour eviter deadlock
+        if start_new_timer:
+            self.schedule_explosion()
 
-    def start_timer(self):
-        if self.timer:
-            self.timer.cancel()
+    def schedule_explosion(self):
         delay = random.uniform(BOMB_TIME_MIN, BOMB_TIME_MAX)
-        print(f"[~] Explosion dans {delay:.1f}s")
+        self.log(f"[~] Explosion dans {delay:.1f}s")
         self.timer = threading.Timer(delay, self.explode)
         self.timer.daemon = True
         self.timer.start()
@@ -105,21 +111,22 @@ class Server:
     def start_game(self):
         with self.lock:
             if len(self.players) < MIN_PLAYERS:
-                print(f"[!] Pas assez de joueurs ({len(self.players)}/{MIN_PLAYERS})")
+                self.log(f"[!] Pas assez de joueurs ({len(self.players)}/{MIN_PLAYERS})")
                 return
             if self.game_started:
-                print("[!] Partie deja en cours")
+                self.log("[!] Partie deja en cours")
                 return
             
             self.game_started = True
             self.alive = list(self.players.keys())
             self.bomb_holder = random.choice(self.alive)
             
-            print(f"[*] Partie lancee avec {len(self.alive)} joueurs")
-            print(f"[o] Porteur initial: {self.bomb_holder}")
-            self.broadcast({'event': 'start', 'holder': self.bomb_holder, 'players': self.alive})
+            self.log(f"[*] Partie lancee avec {len(self.alive)} joueurs")
+            self.log(f"[o] Porteur initial: {self.bomb_holder}")
+            self.broadcast({'event': 'start', 'holder': self.bomb_holder, 'players': list(self.alive)})
         
-        self.start_timer()
+        # Hors du lock
+        self.schedule_explosion()
 
     def reset_game(self):
         with self.lock:
@@ -129,7 +136,7 @@ class Server:
             self.game_started = False
             self.alive = list(self.players.keys())
             self.bomb_holder = None
-            print(f"[*] Reset. {len(self.alive)} joueurs prets.")
+            self.log(f"[*] Reset. {len(self.alive)} joueurs prets.")
             self.broadcast({'event': 'reset'})
 
     def run(self):
@@ -138,9 +145,9 @@ class Server:
         server.bind((HOST, PORT))
         server.listen(10)
         
-        print(f"Serveur demarre sur {HOST}:{PORT}")
-        print(f"En attente de {MIN_PLAYERS} joueurs minimum")
-        print("Commandes: start, status, reset, quit\n")
+        self.log(f"Serveur demarre sur {HOST}:{PORT}")
+        self.log(f"En attente de {MIN_PLAYERS} joueurs minimum")
+        self.log("Commandes: start, status, reset, quit\n")
         
         threading.Thread(target=self.accept_loop, args=(server,), daemon=True).start()
         
@@ -150,9 +157,9 @@ class Server:
                 if cmd == 'start':
                     self.start_game()
                 elif cmd == 'status':
-                    print(f"Connectes: {list(self.players.keys())}")
-                    print(f"En vie: {self.alive}")
-                    print(f"Porteur: {self.bomb_holder}")
+                    self.log(f"Connectes: {list(self.players.keys())}")
+                    self.log(f"En vie: {self.alive}")
+                    self.log(f"Porteur: {self.bomb_holder}")
                 elif cmd == 'reset':
                     self.reset_game()
                 elif cmd == 'quit':
