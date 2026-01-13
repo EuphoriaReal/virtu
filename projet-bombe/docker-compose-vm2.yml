@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  registry:
+    image: registry:2
+    container_name: registry
+    ports:
+      - "5000:5000"
+    volumes:
+      - registry-data:/var/lib/registry
+
+  player3:
+    image: 192.168.200.22:5000/bomb-player:latest
+    container_name: player3
+    environment:
+      - PLAYER_ID=Player3-VM2
+      - SERVER_HOST=192.168.200.23
+      - SERVER_PORT=6000
+    network_mode: host
+
+  player4:
+    image: 192.168.200.22:5000/bomb-player:latest
+    container_name: player4
+    environment:
+      - PLAYER_ID=Player4-VM2
+      - SERVER_HOST=192.168.200.23
+      - SERVER_PORT=6000
+    network_mode: host
+
+volumes:
+  registry-data:

@@ -1,0 +1,45 @@
+version: "3.8"
+
+services:
+  server:
+    build: ./server
+    image: 192.168.200.22:5000/bomb-server:latest
+    container_name: server
+    ports:
+      - "6000:6000"
+    environment:
+      - PORT=6000
+      - MIN_PLAYERS=4
+    stdin_open: true
+    tty: true
+    networks:
+      - game
+
+  player1:
+    build: ./player
+    image: 192.168.200.22:5000/bomb-player:latest
+    container_name: player1
+    environment:
+      - PLAYER_ID=Player1-VM1
+      - SERVER_HOST=server
+      - SERVER_PORT=6000
+    depends_on:
+      - server
+    networks:
+      - game
+
+  player2:
+    build: ./player
+    image: 192.168.200.22:5000/bomb-player:latest
+    container_name: player2
+    environment:
+      - PLAYER_ID=Player2-VM1
+      - SERVER_HOST=server
+      - SERVER_PORT=6000
+    depends_on:
+      - server
+    networks:
+      - game
+
+networks:
+  game:
