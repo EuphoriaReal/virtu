@@ -12,6 +12,8 @@ MIN_PLAYERS = int(os.environ.get('MIN_PLAYERS', 3))
 BOMB_TIME_MIN = float(os.environ.get('BOMB_TIME_MIN', 5.0))
 BOMB_TIME_MAX = float(os.environ.get('BOMB_TIME_MAX', 15.0))
 
+SEP = b'\n'
+
 
 class Server:
     def __init__(self):
@@ -26,41 +28,50 @@ class Server:
     def log(self, msg):
         print(msg, flush=True)
 
+    def send(self, sock, msg):
+        try:
+            sock.send(json.dumps(msg).encode() + SEP)
+        except:
+            pass
+
     def broadcast(self, msg, exclude=None):
-        data = json.dumps(msg).encode()
         for pid, sock in list(self.players.items()):
             if pid != exclude:
-                try:
-                    sock.send(data)
-                except:
-                    pass
+                self.send(sock, msg)
 
     def handle_client(self, sock, addr):
         player_id = None
+        buffer = b''
         try:
             while self.running:
                 data = sock.recv(4096)
                 if not data:
                     break
-                msg = json.loads(data.decode())
+                buffer += data
                 
-                if msg['action'] == 'register':
-                    player_id = msg['player_id']
-                    with self.lock:
-                        self.players[player_id] = sock
-                        if not self.game_started:
-                            self.alive.append(player_id)
-                    self.log(f"[+] {player_id} connecte ({len(self.players)} joueurs)")
-                    sock.send(json.dumps({'status': 'ok'}).encode())
-                    self.broadcast({'event': 'join', 'player': player_id}, player_id)
-                
-                elif msg['action'] == 'pass':
-                    target = msg['to']
-                    with self.lock:
-                        if player_id == self.bomb_holder and target in self.alive and target != player_id:
-                            self.bomb_holder = target
-                            self.log(f"[>] Bombe: {player_id} -> {target}")
-                            self.broadcast({'event': 'pass', 'from': player_id, 'to': target})
+                while SEP in buffer:
+                    line, buffer = buffer.split(SEP, 1)
+                    if not line:
+                        continue
+                    msg = json.loads(line.decode())
+                    
+                    if msg['action'] == 'register':
+                        player_id = msg['player_id']
+                        with self.lock:
+                            self.players[player_id] = sock
+                            if not self.game_started:
+                                self.alive.append(player_id)
+                        self.log(f"[+] {player_id} connecte ({len(self.players)} joueurs)")
+                        self.send(sock, {'status': 'ok'})
+                        self.broadcast({'event': 'join', 'player': player_id}, player_id)
+                    
+                    elif msg['action'] == 'pass':
+                        target = msg['to']
+                        with self.lock:
+                            if player_id == self.bomb_holder and target in self.alive and target != player_id:
+                                self.bomb_holder = target
+                                self.log(f"[>] Bombe: {player_id} -> {target}")
+                                self.broadcast({'event': 'pass', 'from': player_id, 'to': target})
         except:
             pass
         finally:
@@ -97,7 +108,6 @@ class Server:
                 self.broadcast({'event': 'new_round', 'holder': self.bomb_holder, 'alive': list(self.alive)})
                 start_new_timer = True
         
-        # Hors du lock pour eviter deadlock
         if start_new_timer:
             self.schedule_explosion()
 
@@ -125,7 +135,6 @@ class Server:
             self.log(f"[o] Porteur initial: {self.bomb_holder}")
             self.broadcast({'event': 'start', 'holder': self.bomb_holder, 'players': list(self.alive)})
         
-        # Hors du lock
         self.schedule_explosion()
 
     def reset_game(self):

@@ -7,6 +7,8 @@ import time
 import threading
 import sys
 
+SEP = b'\n'
+
 
 def main():
     if len(sys.argv) < 2:
@@ -30,8 +32,21 @@ def main():
         print("Impossible de se connecter")
         return
     
-    sock.send(json.dumps({'action': 'register', 'player_id': player_id}).encode())
-    resp = json.loads(sock.recv(4096).decode())
+    def send(msg):
+        try:
+            sock.send(json.dumps(msg).encode() + SEP)
+        except:
+            pass
+    
+    send({'action': 'register', 'player_id': player_id})
+    
+    buffer = b''
+    while SEP not in buffer:
+        buffer += sock.recv(4096)
+    line = buffer.split(SEP, 1)[0]
+    buffer = buffer.split(SEP, 1)[1] if SEP in buffer else b''
+    
+    resp = json.loads(line.decode())
     if resp.get('status') != 'ok':
         print("Erreur d'enregistrement")
         return
@@ -52,11 +67,8 @@ def main():
         with lock:
             if state['has_bomb'] and state['alive'] and state['other_players']:
                 target = random.choice(state['other_players'])
-                try:
-                    sock.send(json.dumps({'action': 'pass', 'to': target}).encode())
-                    print(f"Bombe passee a {target}")
-                except:
-                    pass
+                send({'action': 'pass', 'to': target})
+                print(f"Bombe passee a {target}")
     
     while state['running']:
         try:
@@ -64,71 +76,79 @@ def main():
             if not data:
                 print("Deconnecte du serveur")
                 break
-            msg = json.loads(data.decode())
-            event = msg.get('event')
             
-            if event == 'start':
-                with lock:
-                    state['alive'] = True
-                    state['other_players'] = [p for p in msg['players'] if p != player_id]
-                    if msg['holder'] == player_id:
-                        state['has_bomb'] = True
-                        print(">>> J'AI LA BOMBE! <<<")
-                        threading.Thread(target=pass_bomb, daemon=True).start()
-                    else:
-                        state['has_bomb'] = False
-                print(f"Partie lancee! Joueurs: {msg['players']}")
+            buffer += data
             
-            elif event == 'pass':
-                with lock:
-                    if msg['to'] == player_id:
-                        state['has_bomb'] = True
-                        print(">>> J'AI LA BOMBE! <<<")
-                        threading.Thread(target=pass_bomb, daemon=True).start()
-                    elif msg['from'] == player_id:
-                        state['has_bomb'] = False
-            
-            elif event == 'new_round':
-                with lock:
-                    state['other_players'] = [p for p in msg.get('alive', []) if p != player_id]
-                    if msg['holder'] == player_id:
-                        state['has_bomb'] = True
-                        print(">>> J'AI LA BOMBE! <<<")
-                        threading.Thread(target=pass_bomb, daemon=True).start()
-                    else:
-                        state['has_bomb'] = False
-                print(f"Nouveau round. En vie: {msg.get('alive', [])}")
-            
-            elif event == 'explosion':
-                with lock:
-                    eliminated = msg['eliminated']
-                    if eliminated == player_id:
-                        print("BOOM! Je suis elimine...")
-                        state['alive'] = False
-                        state['has_bomb'] = False
-                    else:
-                        if eliminated in state['other_players']:
-                            state['other_players'].remove(eliminated)
-                        print(f"{eliminated} elimine!")
-            
-            elif event == 'win':
-                with lock:
-                    state['has_bomb'] = False
-                if msg['winner'] == player_id:
-                    print("*** J'AI GAGNE! ***")
-                else:
-                    print(f"Gagnant: {msg['winner']}")
-            
-            elif event == 'reset':
-                with lock:
-                    state['alive'] = True
-                    state['has_bomb'] = False
-                    state['other_players'] = []
-                print("Reset. En attente nouvelle partie...")
-            
-            elif event == 'join':
-                print(f"{msg['player']} a rejoint")
+            while SEP in buffer:
+                line, buffer = buffer.split(SEP, 1)
+                if not line:
+                    continue
+                    
+                msg = json.loads(line.decode())
+                event = msg.get('event')
                 
+                if event == 'start':
+                    with lock:
+                        state['alive'] = True
+                        state['other_players'] = [p for p in msg['players'] if p != player_id]
+                        if msg['holder'] == player_id:
+                            state['has_bomb'] = True
+                            print(">>> J'AI LA BOMBE! <<<")
+                            threading.Thread(target=pass_bomb, daemon=True).start()
+                        else:
+                            state['has_bomb'] = False
+                    print(f"Partie lancee! Joueurs: {msg['players']}")
+                
+                elif event == 'pass':
+                    with lock:
+                        if msg['to'] == player_id:
+                            state['has_bomb'] = True
+                            print(">>> J'AI LA BOMBE! <<<")
+                            threading.Thread(target=pass_bomb, daemon=True).start()
+                        elif msg['from'] == player_id:
+                            state['has_bomb'] = False
+                
+                elif event == 'new_round':
+                    with lock:
+                        state['other_players'] = [p for p in msg.get('alive', []) if p != player_id]
+                        if msg['holder'] == player_id:
+                            state['has_bomb'] = True
+                            print(">>> J'AI LA BOMBE! <<<")
+                            threading.Thread(target=pass_bomb, daemon=True).start()
+                        else:
+                            state['has_bomb'] = False
+                    print(f"Nouveau round. En vie: {msg.get('alive', [])}")
+                
+                elif event == 'explosion':
+                    with lock:
+                        eliminated = msg['eliminated']
+                        if eliminated == player_id:
+                            print("BOOM! Je suis elimine...")
+                            state['alive'] = False
+                            state['has_bomb'] = False
+                        else:
+                            if eliminated in state['other_players']:
+                                state['other_players'].remove(eliminated)
+                            print(f"{eliminated} elimine!")
+                
+                elif event == 'win':
+                    with lock:
+                        state['has_bomb'] = False
+                    if msg['winner'] == player_id:
+                        print("*** J'AI GAGNE! ***")
+                    else:
+                        print(f"Gagnant: {msg['winner']}")
+                
+                elif event == 'reset':
+                    with lock:
+                        state['alive'] = True
+                        state['has_bomb'] = False
+                        state['other_players'] = []
+                    print("Reset. En attente nouvelle partie...")
+                
+                elif event == 'join':
+                    print(f"{msg['player']} a rejoint")
+                    
         except Exception as e:
             print(f"Erreur: {e}")
             break
