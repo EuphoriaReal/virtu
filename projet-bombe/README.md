@@ -1,73 +1,69 @@
-# Jeu de la Bombe - Docker
 
-Jeu distribue : les joueurs se passent une bombe jusqu'a explosion. Le dernier en vie gagne.
+# Jeu de la Bombe
 
 ## Architecture
 
 ```
-VM1 (192.168.200.23)           VM2 (192.168.200.22)
-- Server (port 6000)           - Registry (port 5000)
-- Player1                      - Player3
-- Player2                      - Player4
+VM1 (192.168.200.22)           VM2 (192.168.200.23)
+├── Server (port 6000)         ├── Registry (port 5000)
+├── Player1                    ├── Player3
+└── Player2                    └── Player4
+```
+
+## Configuration
+
+Sur VM1 et VM2, editer `/etc/docker/daemon.json` :
+
+```json
+{"insecure-registries": ["192.168.200.23:5000"]}
+```
+
+Puis :
+
+```bash
+sudo systemctl restart docker
 ```
 
 ## Deploiement
 
-### 1. VM2 : Demarrer le registry
+### VM2
 
 ```bash
 docker-compose -f docker-compose-vm2.yml up -d registry
 ```
 
-### 2. Configurer Docker pour le registry insecure (VM1 et VM2)
-
-Editer `/etc/docker/daemon.json` :
-```json
-{"insecure-registries": ["192.168.200.22:5000"]}
-```
-
-Redemarrer Docker :
-```bash
-sudo systemctl restart docker
-```
-
-### 3. VM1 : Build et push des images
+### VM1
 
 ```bash
 docker-compose -f docker-compose-vm1.yml build
 docker-compose -f docker-compose-vm1.yml push
-```
-
-### 4. VM1 : Lancer le serveur et les joueurs
-
-```bash
 docker-compose -f docker-compose-vm1.yml up -d
 ```
 
-### 5. VM2 : Lancer les joueurs
+### VM2
 
 ```bash
 docker-compose -f docker-compose-vm2.yml up -d player3 player4
 ```
 
-### 6. Lancer la partie
+## Lancer une partie via VM1
 
 ```bash
 docker attach server
-# Taper "start" quand les 4 joueurs sont connectes
 ```
 
-### Bonus : Windows
+| Commande   | Action                     |
+| ---------- | -------------------------- |
+| `start`  | Lancer la partie           |
+| `status` | Voir les joueurs           |
+| `reset`  | Reinitialiser pour rejouer |
+| `quit`   | Arreter le serveur         |
+
+## Bonus Windows
 
 ```cmd
-python player_windows.py 192.168.200.23 MonPseudo
+python player_windows.py 192.168.200.22 MonPseudo
 ```
-
-## Commandes serveur
-
-- `start` : Lancer la partie
-- `status` : Voir les joueurs
-- `quit` : Arreter
 
 ## Logs
 
