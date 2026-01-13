@@ -15,21 +15,23 @@ BOMB_TIME_MAX = float(os.environ.get('BOMB_TIME_MAX', 15.0))
 
 class Server:
     def __init__(self):
-        self.players = {}  # {player_id: socket}
+        self.players = {}
         self.alive = []
         self.bomb_holder = None
         self.running = True
         self.game_started = False
+        self.timer = None
         self.lock = threading.Lock()
 
     def broadcast(self, msg, exclude=None):
         data = json.dumps(msg).encode()
-        for pid, sock in self.players.items():
-            if pid != exclude:
-                try:
-                    sock.send(data)
-                except:
-                    pass
+        with self.lock:
+            for pid, sock in list(self.players.items()):
+                if pid != exclude:
+                    try:
+                        sock.send(data)
+                    except:
+                        pass
 
     def handle_client(self, sock, addr):
         player_id = None
@@ -44,7 +46,8 @@ class Server:
                     player_id = msg['player_id']
                     with self.lock:
                         self.players[player_id] = sock
-                        self.alive.append(player_id)
+                        if not self.game_started:
+                            self.alive.append(player_id)
                     print(f"[+] {player_id} connecte ({len(self.players)} joueurs)")
                     sock.send(json.dumps({'status': 'ok'}).encode())
                     self.broadcast({'event': 'join', 'player': player_id}, player_id)
@@ -52,7 +55,7 @@ class Server:
                 elif msg['action'] == 'pass':
                     target = msg['to']
                     with self.lock:
-                        if player_id == self.bomb_holder and target in self.alive:
+                        if player_id == self.bomb_holder and target in self.alive and target != player_id:
                             self.bomb_holder = target
                             print(f"[>] Bombe: {player_id} -> {target}")
                             self.broadcast({'event': 'pass', 'from': player_id, 'to': target})
@@ -72,7 +75,9 @@ class Server:
                 return
             
             eliminated = self.bomb_holder
-            self.alive.remove(eliminated)
+            if eliminated in self.alive:
+                self.alive.remove(eliminated)
+            
             print(f"[X] BOOM! {eliminated} elimine!")
             self.broadcast({'event': 'explosion', 'eliminated': eliminated})
             
@@ -81,18 +86,21 @@ class Server:
                 print(f"[*] Gagnant: {winner}")
                 self.broadcast({'event': 'win', 'winner': winner})
                 self.game_started = False
-            else:
+                print("[*] Tapez 'reset' puis 'start' pour rejouer.")
+            elif len(self.alive) > 1:
                 self.bomb_holder = random.choice(self.alive)
                 print(f"[o] Nouveau porteur: {self.bomb_holder}")
-                self.broadcast({'event': 'new_round', 'holder': self.bomb_holder})
+                self.broadcast({'event': 'new_round', 'holder': self.bomb_holder, 'alive': self.alive})
                 self.start_timer()
 
     def start_timer(self):
+        if self.timer:
+            self.timer.cancel()
         delay = random.uniform(BOMB_TIME_MIN, BOMB_TIME_MAX)
         print(f"[~] Explosion dans {delay:.1f}s")
-        timer = threading.Timer(delay, self.explode)
-        timer.daemon = True
-        timer.start()
+        self.timer = threading.Timer(delay, self.explode)
+        self.timer.daemon = True
+        self.timer.start()
 
     def start_game(self):
         with self.lock:
@@ -110,7 +118,19 @@ class Server:
             print(f"[*] Partie lancee avec {len(self.alive)} joueurs")
             print(f"[o] Porteur initial: {self.bomb_holder}")
             self.broadcast({'event': 'start', 'holder': self.bomb_holder, 'players': self.alive})
-            self.start_timer()
+        
+        self.start_timer()
+
+    def reset_game(self):
+        with self.lock:
+            if self.timer:
+                self.timer.cancel()
+                self.timer = None
+            self.game_started = False
+            self.alive = list(self.players.keys())
+            self.bomb_holder = None
+            print(f"[*] Reset. {len(self.alive)} joueurs prets.")
+            self.broadcast({'event': 'reset'})
 
     def run(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -120,7 +140,7 @@ class Server:
         
         print(f"Serveur demarre sur {HOST}:{PORT}")
         print(f"En attente de {MIN_PLAYERS} joueurs minimum")
-        print("Commandes: start, status, quit\n")
+        print("Commandes: start, status, reset, quit\n")
         
         threading.Thread(target=self.accept_loop, args=(server,), daemon=True).start()
         
@@ -130,9 +150,11 @@ class Server:
                 if cmd == 'start':
                     self.start_game()
                 elif cmd == 'status':
-                    print(f"Joueurs: {list(self.players.keys())}")
+                    print(f"Connectes: {list(self.players.keys())}")
                     print(f"En vie: {self.alive}")
                     print(f"Porteur: {self.bomb_holder}")
+                elif cmd == 'reset':
+                    self.reset_game()
                 elif cmd == 'quit':
                     self.running = False
             except (EOFError, KeyboardInterrupt):
