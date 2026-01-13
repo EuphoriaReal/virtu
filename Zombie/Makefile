@@ -1,17 +1,14 @@
-
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c99
-TARGET = zombie_manager
+CFLAGS = -Wall -Wextra -std=c11
+TARGET = zombie
+SRC = zombie.c
 
 all: $(TARGET)
 
-$(TARGET): zombie_manager.c
-	$(CC) $(CFLAGS) -o $(TARGET) zombie_manager.c
+$(TARGET): $(SRC)
+	$(CC) $(CFLAGS) -o $(TARGET) $(SRC)
 
 clean:
 	rm -f $(TARGET)
 
-run: $(TARGET)
-	./$(TARGET)
-
-.PHONY: all clean run
+.PHONY: all clean

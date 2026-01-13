@@ -1,47 +1,36 @@
-# =====================================================
-# Makefile pour inodes_demo.c
-# =====================================================
+# -----------------------------
+# Makefile pour inodes_demo
+# -----------------------------
 
-# Compilateur
-CC = gcc
-CFLAGS = -Wall -O2
-
-# Nom de l'exécutable
+# Nom du programme final
 TARGET = inodes_demo
 
-# Fichier source
-SRC = inodes_demo.c
+# Compilateur et options
+CC = gcc
+CFLAGS = -Wall -Wextra -std=c99 -O2
 
-# -----------------------------------------------------
-# Règles
-# -----------------------------------------------------
+# Fichiers sources et objets
+SRCS = inodes_demo.c
+OBJS = $(SRCS:.c=.o)
 
-# Règle par défaut : compiler
+# -----------------------------
+# Règles principales
+# -----------------------------
+
 all: $(TARGET)
 
-# Compilation
-$(TARGET): $(SRC)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRC)
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $^
 
-# Nettoyage
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Supprime les fichiers objets et l'exécutable
 clean:
-	rm -f $(TARGET)
-	rm -rf inodes_demo
+	rm -f $(OBJS) $(TARGET)
 
-# Exécuter le programme
-run:
-	./$(TARGET)
+# Supprime aussi le dossier de travail fs_demo
+mrproper: clean
+	rm -rf fs_demo
 
-# Cas 1 : gros fichier
-big:
-	./$(TARGET) big
-
-# Cas 2 : saturation des inodes
-inode:
-	./$(TARGET) inode
-
-# Réinitialisation
-reset:
-	./$(TARGET) reset
-
-.PHONY: all clean run big inode reset
+.PHONY: all clean mrproper

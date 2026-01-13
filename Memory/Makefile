@@ -1,44 +1,24 @@
-# Makefile pour le projet Buffer Overflow sur mémoire partagée
+# ===============================
+# Makefile - Démo mémoire partagée
+# ===============================
 
 CC = gcc
-CFLAGS = -Wall -Wextra -g
+CFLAGS = -Wall -Wextra -std=c99 -O2
+
 TARGETS = writer reader
 
+# Règle par défaut
 all: $(TARGETS)
 
+# Compilation des exécutables
 writer: writer.c
-	$(CC) $(CFLAGS) -o writer writer.c
+	$(CC) $(CFLAGS) -o $@ $<
 
 reader: reader.c
-	$(CC) $(CFLAGS) -o reader reader.c
+	$(CC) $(CFLAGS) -o $@ $<
 
+# Nettoyage
 clean:
 	rm -f $(TARGETS)
-	ipcs -m | grep 0x00001234 | awk '{print $$2}' | xargs -r ipcrm -m
 
-run_writer:
-	./writer
-
-run_reader:
-	./reader
-
-# Nettoyer les segments de mémoire partagée orphelins
-clean_shm:
-	@echo "Nettoyage des segments de mémoire partagée..."
-	@ipcs -m | grep 0x00001234 | awk '{print $$2}' | xargs -r ipcrm -m
-	@echo "Nettoyage terminé"
-
-status:
-	@echo "=== Segments de mémoire partagée actifs ==="
-	@ipcs -m
-
-help:
-	@echo "Commandes disponibles:"
-	@echo "  make          - Compile writer et reader"
-	@echo "  make clean    - Supprime les exécutables et la mémoire partagée"
-	@echo "  make run_writer - Lance le processus writer"
-	@echo "  make run_reader - Lance le processus reader"
-	@echo "  make clean_shm  - Nettoie uniquement la mémoire partagée"
-	@echo "  make status     - Affiche les segments de mémoire partagée actifs"
-
-.PHONY: all clean run_writer run_reader clean_shm status help
+.PHONY: all clean

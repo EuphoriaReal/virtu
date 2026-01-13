@@ -1,65 +1,71 @@
 
-# Démonstrateur Inodes & Blocs — Linux
+# inodes_demo
 
-Ce projet illustre le fonctionnement des inodes et des blocs dans un système de fichiers Linux.
+## Description
 
-Il permet de comparer la taille théorique des fichiers et  l’espace réel occupé sur le disque .
+`inodes_demo` est un petit démonstrateur pour explorer deux aspects des systèmes de fichiers :  
 
-### **Contenu du projet**
+1. **Gros fichier** : création d'un fichier de grande taille (50 Mo) et affichage de son espace logique et réel.  
+2. **Saturation des inodes** : création de nombreux petits fichiers pour observer l'impact sur l'espace disque et les inodes.
 
-* `inodes_demo.c` : code source du démonstrateur
-* `Makefile` : compilation et gestion de la démo
-* `inodes_demo/` : répertoire temporaire pour les fichiers de test
+Le programme inclut également une **réinitialisation simple** pour supprimer le répertoire de travail `fs_demo`.
 
-### **Fonctionnalités**
+---
 
-1. **Gros fichier simulé (type JPG)**
-   * Création d’un fichier de taille configurable rempli de zéros avec un magic number JPG
-   * Affichage de la taille théorique, du nombre de blocs, de la taille d’un bloc et de l’espace réel occupé
-2. **Saturation des inodes avec petits fichiers**
-   * Création de nombreux fichiers d’1 octet
-   * Affichage du nombre de fichiers, de la taille théorique totale, de l’espace pris par les inodes et de l’espace réel sur disque
+## Compilation
 
-### **Concepts clés**
+Pour compiler le programme, utilisez le Makefile fourni :
 
-* **Inodes** : stockent les métadonnées des fichiers (permissions, taille, blocs).
-* **Blocs** : unité minimale d’allocation du système de fichiers (souvent 4096 octets).
-* Différence entre taille théorique et réelle due aux blocs complets et aux inodes.
-
-### **Utilisation**
-
-Compiler :
-
-```
+```bash
 make
+````
+
+Le binaire généré s'appelle :
+
+```bash
+./inodes_demo
 ```
 
-Exécuter le programme :
+---
 
-```
-make run
-```
+## Utilisation
 
-Gros fichier :
+Le programme accepte un argument pour choisir le mode :
 
-```
-make big
+```bash
+./inodes_demo {big|inode|reset}
 ```
 
-Saturation des inodes :
+* `big` : crée le gros fichier (`fs_demo/image.jpg`) et affiche ses caractéristiques.
+* `inode` : crée de nombreux petits fichiers dans `fs_demo/small` pour démontrer la saturation des inodes.
+* `reset` : supprime le répertoire `fs_demo` et tous ses fichiers, permettant de repartir à zéro.
 
+### Exemples
+
+Créer le gros fichier :
+
+```bash
+./inodes_demo big
 ```
-make inode
+
+Créer les petits fichiers pour saturation des inodes :
+
+```bash
+./inodes_demo inode
 ```
 
 Réinitialiser la démo :
 
-```
-make reset
+```bash
+./inodes_demo reset
 ```
 
-Nettoyer :
+---
 
-```
+## Nettoyage
+
+Pour supprimer le binaire et les fichiers objets générés par la compilation :
+
+```bash
 make clean
 ```

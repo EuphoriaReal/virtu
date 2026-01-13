@@ -1,118 +1,72 @@
-# Démonstration de Buffer Overflow en Mémoire Partagée (IPC)
 
-Ce projet démontre comment un **buffer overflow** peut se produire dans une mémoire partagée entre processus, et comment le détecter. C'est un exemple éducatif pour comprendre :
+# Démonstration de buffer overflow en mémoire partagée
 
-* La gestion de la mémoire partagée (IPC - Inter-Process Communication)
-* Les vulnérabilités de type buffer overflow
-* Les techniques de détection (canary values)
-* L'importance de la validation des entrées
+## Objectif
 
-## Architecture
+Ce projet illustre, de manière volontairement simple, les effets d'un **buffer overflow** dans une structure partagée entre deux processus à l'aide de la mémoire partagée System.
 
-Le projet se compose de **deux processus indépendants** :
+---
 
-### 1. **Writer** (Processus écrivain)
+## Fichiers
 
-* Crée et écrit dans la mémoire partagée
-* Propose 3 modes d'écriture :
-  * **Sécurisée** : utilise `strncpy` avec vérification de taille
-  * **Overflow léger** : dépasse le buffer de quelques octets
-  * **Overflow important** : écrase complètement la structure
+- `writer.c`  
+  Crée la mémoire partagée et écrit dans le buffer.
+  Deux modes sont proposés : écriture sécurisée et écriture avec overflow.
 
-### 2. **Reader** (Processus lecteur)
+- `reader.c`  
+  Lit la mémoire partagée et vérifie son intégrité.
 
-* Lit et surveille la mémoire partagée
-* Détecte les corruptions via un "canary"
-* Affiche des dumps hexadécimaux pour l'analyse
+---
 
-## Structure de la Mémoire Partagée
-
-```
-+------------------+
-| count (4 bytes)  |  ← Compteur d'écritures
-+------------------+
-| buffer[100]      |  ← Buffer principal (VULNÉRABLE)
-+------------------+
-| overflow_detector|  ← "Canary" pour détecter l'overflow
-|     [20]         |     Valeur: "CANARY_INTACT"
-+------------------+
-```
-
-## Compilation et Exécution
-
-### Compilation
-
-bash
+## Compilation
 
 ```bash
 make
-# ou
-gcc -Wall -Wextra -g -o writer writer.c
-gcc -Wall -Wextra -g -o reader reader.c
 ```
 
-### Lancement
+Deux exécutables sont générés :
 
-**Terminal 1 - Writer :**
+* `writer`
+* `reader`
 
-bash
+---
+
+## Utilisation
+
+### Initialisation / écriture
 
 ```bash
-./writer
+./writer reset
+./writer safe
+./writer overflow
 ```
 
-**Terminal 2 - Reader (dans un autre terminal) :**
+* `reset` : initialise la mémoire partagée et le canary.
+* `safe` : écriture contrôlée, sans corruption.
+* `overflow` : écriture volontairement dangereuse provoquant un overflow.
 
-bash
+### Lecture / vérification
 
 ```bash
 ./reader
 ```
 
-## Scénarios de Test
+Le programme affiche :
 
-### Scénario 1 : Écriture normale (sécurisée)
+* le contenu du buffer,
+* l'état du canary,
+* la détection éventuelle d'un overflow.
 
-1. Dans **writer** : choisir option `1`
-2. Entrer un texte court (< 99 caractères)
-3. Dans **reader** : choisir option `2` pour vérifier l'intégrité
-4. Résultat : Canary intact, pas d'overflow
+---
 
-### Scénario 2 : Overflow
+## Principe de la démonstration
 
-1. Dans **writer** : choisir option 2
-2. Un texte de 199 caractères est généré
-3. Dans **reader** : observer la corruption complète
-4. Résultat : Le canary est complètement écrasé
+La structure partagée contient :
 
-## Analyse Technique
+* un compteur,
+* un buffer de taille fixe,
+* une zone sentinelle ( *canary* ).
 
-### Pourquoi le buffer overflow se produit-il ?
+Un dépassement du buffer entraîne l'écrasement du canary, ce qui permet de détecter simplement une corruption mémoire.
 
-c
-
-```c
-// DANGEREUX : strcpy ne vérifie pas la taille
-strcpy(data->buffer, long_string);
-
-// SÉCURISÉ : strncpy limite la copie
-strncpy(data->buffer, input,sizeof(data->buffer)-1);
-```
-
-### Le mécanisme du Canary
-
-Le "canary" est une valeur sentinelle placée après le buffer :
-
-* Si le canary reste `"CANARY_INTACT"` → pas d'overflow
-* Si le canary change → le buffer a été dépassé
-
-## Nettoyage
-
-Pour tout nettoyer après les tests :
-
-bash
-
-```bash
-make clean        # Supprime les exécutables + mémoire partagée
-make clean_shm    # Supprime uniquement la mémoire partagée
-```
+---
