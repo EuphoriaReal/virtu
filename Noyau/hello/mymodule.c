@@ -4,9 +4,8 @@
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("MOI");
-MODULE_DESCRIPTION("Mon module crash !!");
+MODULE_DESCRIPTION("Hello World en mode noyau");
 MODULE_VERSION("1.0");
-
 
 static int __init hello_init(void)
 {
