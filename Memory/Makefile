@@ -1,24 +1,16 @@
-# ===============================
-# Makefile - Démo mémoire partagée
-# ===============================
-
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c99 -O2
+CFLAGS = -Wall -std=c99
 
-TARGETS = writer reader
+all: writer reader
 
-# Règle par défaut
-all: $(TARGETS)
-
-# Compilation des exécutables
 writer: writer.c
 	$(CC) $(CFLAGS) -o $@ $<
 
 reader: reader.c
 	$(CC) $(CFLAGS) -o $@ $<
 
-# Nettoyage
 clean:
-	rm -f $(TARGETS)
+	rm -f writer reader
+	ipcrm -M 0x1234 2>/dev/null || true
 
 .PHONY: all clean

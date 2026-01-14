@@ -1,12 +1,14 @@
 /*
- * reader.c
- * Lecture et détection simple de corruption mémoire
- * Usage: ./reader
+ * reader.c - Monitoring continu de la mémoire partagée
+ * Usage: ./reader [once]
+ *   sans argument : monitoring continu
+ *   avec "once"   : lecture unique
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 
@@ -19,12 +21,23 @@ typedef struct {
     char canary[20];
 } shared_data;
 
-int main(void)
+void check_memory(shared_data *data)
+{
+    printf("Counter: %d | ", data->counter);
+    
+    if (strcmp(data->canary, "CANARY_OK") != 0) {
+        printf(">>> OVERFLOW <<<\n");
+    } else {
+        printf("OK\n");
+    }
+}
+
+int main(int argc, char *argv[])
 {
     int shmid = shmget(SHM_KEY, SHM_SIZE, 0666);
     if (shmid == -1) {
         perror("shmget");
-        fprintf(stderr, "Lancez d'abord writer\n");
+        printf("Lancez: ./writer reset\n");
         return 1;
     }
 
@@ -34,14 +47,15 @@ int main(void)
         return 1;
     }
 
-    printf("Counter : %d\n", data->counter);
-    printf("Buffer  : %.50s\n", data->buffer);
-    printf("Canary  : %s\n", data->canary);
-
-    if (strcmp(data->canary, "CANARY_OK") != 0) {
-        printf(">>> OVERFLOW DÉTECTÉ <<<\n");
+    /* Mode unique ou continu */
+    if (argc > 1 && strcmp(argv[1], "once") == 0) {
+        check_memory(data);
     } else {
-        printf("Mémoire intacte\n");
+        printf("Monitoring (Ctrl+C pour arrêter)\n");
+        while (1) {
+            check_memory(data);
+            sleep(1);
+        }
     }
 
     shmdt(data);
